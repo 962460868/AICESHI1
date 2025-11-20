@@ -1,10 +1,13 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Asset } from '../types';
+import { Asset, GameProject, PerformanceLevel } from '../types';
 
 interface AssetContextType {
   assets: Asset[];
   addAsset: (asset: Asset) => void;
   updateAsset: (asset: Asset) => void;
+  updateAssetProject: (id: string, project: GameProject) => void;
+  updateAssetPerformance: (id: string, performance: PerformanceLevel) => void;
 }
 
 const AssetContext = createContext<AssetContextType | undefined>(undefined);
@@ -31,19 +34,48 @@ export const AssetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addAsset = (asset: Asset) => {
     setAssets(prev => {
-      // Simple de-duplication logic based on filename (In real app, use hash)
-      const exists = prev.find(a => a.fileName === asset.fileName && a.analysis !== null);
-      if (exists) return prev; 
+      // STRICT DE-DUPLICATION: Check if ID already exists
+      const existsById = prev.some(a => a.id === asset.id);
+      if (existsById) {
+        return prev.map(a => a.id === asset.id ? asset : a);
+      }
+      
+      // Secondary check: Filename duplication
+      const existsByName = prev.some(a => a.fileName === asset.fileName && a.status === 'completed');
+      if (existsByName) return prev;
+
       return [asset, ...prev];
     });
   };
 
   const updateAsset = (asset: Asset) => {
-    setAssets(prev => prev.map(a => a.id === asset.id ? asset : a));
+    setAssets(prev => {
+      const exists = prev.some(a => a.id === asset.id);
+      if (!exists) return [asset, ...prev];
+      return prev.map(a => a.id === asset.id ? asset : a);
+    });
+  };
+
+  const updateAssetProject = (id: string, project: GameProject) => {
+    setAssets(prev => prev.map(a => {
+        if (a.id === id && a.analysis) {
+            return { ...a, analysis: { ...a.analysis, project } };
+        }
+        return a;
+    }));
+  };
+
+  const updateAssetPerformance = (id: string, performance: PerformanceLevel) => {
+    setAssets(prev => prev.map(a => {
+        if (a.id === id) {
+            return { ...a, performanceLevel: performance };
+        }
+        return a;
+    }));
   };
 
   return (
-    <AssetContext.Provider value={{ assets, addAsset, updateAsset }}>
+    <AssetContext.Provider value={{ assets, addAsset, updateAsset, updateAssetProject, updateAssetPerformance }}>
       {children}
     </AssetContext.Provider>
   );

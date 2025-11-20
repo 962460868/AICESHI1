@@ -95,3 +95,42 @@ export const extractImageMeta = async (file: File): Promise<ImageMeta> => {
     img.src = objectUrl;
   });
 };
+
+/**
+ * Compresses and resizes an image to reduce API payload size.
+ * This helps avoid 500 Internal Errors from Gemini when sending large files.
+ */
+export const compressImage = async (file: File, maxWidth = 1024, quality = 0.85): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Canvas context not available'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Return data URL (JPEG)
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    
+    img.onerror = reject;
+    img.src = objectUrl;
+  });
+};

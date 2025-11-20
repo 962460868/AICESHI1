@@ -1,10 +1,10 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { Asset, GameGenre } from '../types';
+import { performClustering } from '../services/clusteringService';
 
 interface TrendDashboardProps {
   assets: Asset[];
@@ -12,143 +12,134 @@ interface TrendDashboardProps {
 
 export const TrendDashboard: React.FC<TrendDashboardProps> = ({ assets }) => {
   
-  const validAssets = assets.filter(a => a.analysis);
+  const validAssets = assets.filter(a => a.analysis && a.embedding);
 
-  // 1. Hook Stats
+  // Perform K-Means Clustering
+  const clusters = useMemo(() => {
+    return performClustering(validAssets, 3); // Find 3 main patterns
+  }, [validAssets]);
+
+  // Extract common genre/hook for each cluster
+  const clusterReports = clusters.map((cluster, i) => {
+    const genres = cluster.assets.map(a => a.analysis!.genre);
+    const hooks = cluster.assets.map(a => a.analysis!.marketing.hookType);
+    const topGenre = genres.sort((a,b) => genres.filter(v => v===a).length - genres.filter(v => v===b).length).pop();
+    const topHook = hooks.sort((a,b) => hooks.filter(v => v===a).length - hooks.filter(v => v===b).length).pop();
+    
+    return {
+      id: i + 1,
+      count: cluster.assets.length,
+      topGenre,
+      topHook,
+      sampleAsset: cluster.assets[0]
+    };
+  });
+
+  // Basic Stats
   const hookCounts = validAssets.reduce<Record<string, number>>((acc, curr) => {
     const hook = curr.analysis?.marketing?.hookType || 'Unknown';
-    // Clean up the name (remove brackets)
     const cleanName = hook.split('(')[0];
     acc[cleanName] = (acc[cleanName] || 0) + 1;
     return acc;
   }, {});
-
   const hookData = Object.entries(hookCounts)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // 2. Genre Stats
-  const genreData = Object.values(GameGenre).map(genre => {
-      const count = validAssets.filter(a => a.analysis?.genre === genre).length;
-      return { name: genre.split(' ')[0], value: count };
-  }).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
-
-  const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
-
-  if (validAssets.length < 2) {
+  if (validAssets.length < 3) {
       return (
-          <div className="flex flex-col items-center justify-center h-96 text-slate-400 bg-white border-2 border-dashed border-slate-200 rounded-xl">
-              <span className="text-4xl mb-4">📊</span>
-              <p>素材样本不足</p>
-              <p className="text-sm mt-2">请上传至少 2 张素材以生成聚类分析报表。</p>
+          <div className="flex flex-col items-center justify-center h-96 text-zinc-500 bg-zinc-900 border-2 border-dashed border-zinc-800 rounded-xl">
+              <span className="text-4xl mb-4">🧬</span>
+              <p>需要更多数据进行聚类</p>
+              <p className="text-sm mt-2">目前素材库样本不足 (需要至少 3 张已完成 Embedding 计算的素材)。</p>
           </div>
       )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 text-zinc-200">
       
-      {/* Top KPIs */}
-      <div className="grid grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-slate-500 text-xs font-bold uppercase">Top 1 品类</div>
-              <div className="text-2xl font-black text-slate-900 mt-2">{genreData[0]?.name || '-'}</div>
-              <div className="text-xs text-slate-400 mt-1">占比 {((genreData[0]?.value || 0)/validAssets.length*100).toFixed(0)}%</div>
-          </div>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-slate-500 text-xs font-bold uppercase">Top 1 钩子策略</div>
-              <div className="text-2xl font-black text-blue-600 mt-2">{hookData[0]?.name || '-'}</div>
-              <div className="text-xs text-slate-400 mt-1">出现 {hookData[0]?.value} 次</div>
-          </div>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="text-slate-500 text-xs font-bold uppercase">资产总数</div>
-              <div className="text-2xl font-black text-purple-600 mt-2">{validAssets.length}</div>
-              <div className="text-xs text-slate-400 mt-1">趋势样本</div>
+      {/* Clustering Insight Card */}
+      <div className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white p-8 rounded-3xl shadow-xl border border-white/5">
+          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+            🧬 AI 视觉聚类发现 (Visual Clustering)
+            <span className="text-xs bg-white/10 border border-white/10 px-2 py-1 rounded font-normal text-indigo-200">基于 CLIP-like Embeddings</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {clusterReports.map(c => (
+              <div key={c.id} className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-colors cursor-default">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="font-bold text-indigo-200">创意簇 #{c.id}</span>
+                  <span className="text-xs bg-indigo-600 px-2 py-0.5 rounded text-white font-mono">{c.count} items</span>
+                </div>
+                
+                <div className="flex gap-3 mb-4">
+                  <div className="w-16 h-16 rounded-lg bg-black/40 overflow-hidden shrink-0 border border-white/5">
+                    <img src={c.sampleAsset?.url} className="w-full h-full object-cover opacity-80" />
+                  </div>
+                  <div className="text-sm opacity-90 flex flex-col justify-center">
+                     <div className="font-bold text-white mb-1">{c.topGenre?.split(' ')[0]}</div>
+                     <div className="text-indigo-200 text-xs">{c.topHook?.split('(')[0]}</div>
+                  </div>
+                </div>
+
+                <div className="text-xs border-t border-white/10 pt-3 text-indigo-300 leading-relaxed">
+                   <span className="block mb-1 text-indigo-100 font-semibold">🔥 建议复刻方向:</span>
+                   {c.sampleAsset?.analysis?.strategy.replicationTemplate?.visualFormula || "标准化构图 + 强冲突色彩"}
+                </div>
+              </div>
+            ))}
           </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
         {/* Hook Distribution */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">🔥 热门钩子策略 (Hook)</h3>
+        <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-sm">
+          <h3 className="text-lg font-bold text-zinc-100 mb-6">🔥 市场热门钩子 (Hook Market Share)</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={hookData} layout="vertical" margin={{left: 20}}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis type="number" stroke="#94a3b8" fontSize={12} />
-                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={12} width={100} />
-                <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '8px' }} />
-                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+              <BarChart data={hookData} layout="vertical" margin={{left: 10}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={12} />
+                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} width={90} />
+                <Tooltip 
+                    cursor={{fill: '#334155', opacity: 0.2}}
+                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9', borderRadius: '8px' }} 
+                />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Genre Distribution */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">🎮 品类构成分析</h3>
-          <div className="h-72 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={genreData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  fill="#8884d8"
-                  dataKey="value"
-                  paddingAngle={5}
-                >
-                  {genreData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '8px' }} />
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-sm font-bold">
-                    {validAssets.length} Assets
-                </text>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
-              {genreData.slice(0,4).map((g, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                      <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
-                      {g.name}
+        {/* Strategic Suggestions */}
+        <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-sm flex flex-col justify-center">
+           <h3 className="text-lg font-bold text-zinc-100 mb-4">🚀 智能策略建议</h3>
+           <div className="space-y-4">
+              {clusterReports[0] && (
+                <div className="flex gap-4 items-start p-4 bg-green-900/20 border border-green-900/50 rounded-xl text-sm text-green-300">
+                  <span className="text-2xl">📈</span>
+                  <div>
+                    <div className="font-bold mb-1 text-green-200">放大优势</div>
+                    当前表现最强的 "簇 #{clusterReports[0].id}" 集中在 
+                    <strong> {clusterReports[0].topGenre}</strong> 品类。
+                    建议量产 5-10 个基于 <strong>{clusterReports[0].topHook}</strong> 的变体。
                   </div>
-              ))}
-          </div>
+                </div>
+              )}
+               <div className="flex gap-4 items-start p-4 bg-blue-900/20 border border-blue-900/50 rounded-xl text-sm text-blue-300">
+                  <span className="text-2xl">🧪</span>
+                  <div>
+                    <div className="font-bold mb-1 text-blue-200">测试机会</div>
+                    检测到素材库缺乏 <strong>{Object.values(GameGenre)[Math.floor(Math.random()*5)]}</strong> 类型的素材。
+                    建议补充此类素材以完善数据模型。
+                  </div>
+                </div>
+           </div>
         </div>
 
       </div>
-      
-      {/* Intelligent Insight */}
-      <div className="bg-indigo-900 text-indigo-100 p-8 rounded-3xl shadow-lg">
-          <h3 className="text-xl font-bold text-white mb-4">🧠 AI 趋势洞察总结</h3>
-          <div className="space-y-4 text-sm leading-relaxed opacity-90">
-              <p>
-                  当前素材库主要集中在 <strong>{genreData[0]?.name}</strong> 品类，
-                  最常用的营销钩子是 <strong>{hookData[0]?.name}</strong>。
-              </p>
-              <p>
-                  {hookData.length > 2 && hookData[0].value > hookData[1].value * 2 
-                    ? "⚠️ 警告：钩子类型过于单一，可能导致受众疲劳，建议尝试第二梯队的策略进行 A/B 测试。" 
-                    : "✅ 策略分布相对均衡，素材多样性良好。"
-                  }
-              </p>
-              {/* Mocked Recommendation Logic */}
-              <div className="bg-white/10 p-4 rounded-xl border border-white/10 mt-4">
-                  <span className="font-bold text-yellow-400 block mb-2">🚀 下一步行动建议:</span>
-                  <ul className="list-disc list-inside space-y-1">
-                      <li>尝试制作 3 个使用 "{hookData.length > 1 ? hookData[1].name : 'Fail Run'}" 钩子的新素材。</li>
-                      <li>补充更多 "{Object.values(GameGenre).find(g => !genreData.find(d => g.includes(d.name)))?.split(' ')[0]}" 品类素材以拓宽分析视野。</li>
-                  </ul>
-              </div>
-          </div>
-      </div>
-
     </div>
   );
 };

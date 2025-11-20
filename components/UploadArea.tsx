@@ -1,8 +1,8 @@
 
 import React, { useCallback, useState } from 'react';
-import { Asset } from '../types';
-import { fileToGenerativePart, analyzeImage } from '../services/geminiService';
-import { extractImageMeta } from '../services/imageProcessing';
+import { Asset, PerformanceLevel } from '../types';
+import { analyzeImage, generateEmbedding } from '../services/geminiService';
+import { extractImageMeta, compressImage } from '../services/imageProcessing';
 
 interface UploadAreaProps {
   onAssetProcessed: (asset: Asset) => void;
@@ -17,7 +17,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
     const objectUrl = URL.createObjectURL(file);
     setProcessingFiles(prev => [...prev, file.name]);
 
-    // 1. Initial Asset state (loading)
+    // 1. Initial Asset state
     let newAsset: Asset = {
       id: tempId,
       url: objectUrl,
@@ -25,34 +25,50 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
       uploadDate: new Date().toISOString(),
       computedMeta: { width: 0, height: 0, dominantColors: [], aspectRatio: '?' },
       analysis: null,
-      status: 'processing'
+      status: 'processing',
+      performanceLevel: PerformanceLevel.UNRATED
     };
     
     onAssetProcessed(newAsset);
 
     try {
-      // 2. Run Client-Side Computer Vision (Real Data)
+      // 2. Client-Side Computer Vision (Dimensions & Colors)
       const meta = await extractImageMeta(file);
       newAsset = { ...newAsset, computedMeta: { 
         width: meta.width, 
         height: meta.height, 
-        dominantColors: meta.dominantColors.map(c => c.hex), // Store hexes
+        dominantColors: meta.dominantColors.map(c => c.hex),
         aspectRatio: meta.aspectRatio
       }};
-      onAssetProcessed(newAsset); // Update with meta immediately
+      onAssetProcessed(newAsset);
 
-      // 3. Run AI Analysis (Semantic Data)
-      const base64 = await fileToGenerativePart(file);
-      const analysis = await analyzeImage(base64, file.type);
+      // 3. Gemini Analysis (With Compressed Image)
+      // Compress to max 1024px to avoid 500 errors on huge payloads
+      const compressedDataUrl = await compressImage(file);
+      const base64Data = compressedDataUrl.split(',')[1]; // Remove "data:image/jpeg;base64," header
+
+      const analysis = await analyzeImage(base64Data, 'image/jpeg');
       
-      // Merge Computer Vision colors into the AI result for consistency in the types
+      // Merge CV colors (Trust CV over AI for colors)
       if (analysis.visual) {
         analysis.visual.realColorPalette = meta.dominantColors;
       }
 
+      // 4. Generate Embedding (Semantic Search)
+      // We embed the JSON analysis to create a "Semantic Vector"
+      const semanticString = JSON.stringify({
+        title: analysis.title,
+        genre: analysis.genre,
+        hook: analysis.marketing.hookType,
+        tags: analysis.tags,
+        visualFormula: analysis.strategy.replicationTemplate?.visualFormula
+      });
+      const embedding = await generateEmbedding(semanticString);
+
       onAssetProcessed({
         ...newAsset,
         analysis,
+        embedding,
         status: 'completed'
       });
     } catch (error) {
@@ -72,7 +88,6 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
     
     const files = Array.from(e.dataTransfer.files) as File[];
     files.filter(file => file.type.startsWith('image/')).forEach(processFile);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,8 +106,8 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
         className={`
           relative border-2 border-dashed rounded-3xl p-20 text-center transition-all duration-300
           ${isDragging 
-            ? 'border-blue-500 bg-blue-50 scale-105 shadow-xl' 
-            : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50'
+            ? 'border-blue-500 bg-blue-500/10 scale-105 shadow-xl' 
+            : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500 hover:bg-zinc-800'
           }
         `}
       >
@@ -105,37 +120,36 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
         />
         
         <div className="space-y-6 pointer-events-none">
-          <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-4xl shadow-sm">
-            🧠
+          <div className="w-20 h-20 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto text-4xl shadow-sm">
+            👁️
           </div>
           <div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-2">
-              建立您的智能资产库
+            <h3 className="text-2xl font-bold text-zinc-100 mb-2">
+              AI 视觉资产分析
             </h3>
-            <p className="text-slate-500 max-w-md mx-auto text-sm">
-              集成 <strong>本地 CV 算法</strong> + <strong>Gemini 语义分析</strong>。<br/>
-              自动提取：真实色板、构图类型、游戏品类、核心钩子。
+            <p className="text-zinc-400 max-w-md mx-auto text-sm">
+              支持 <strong>主体检测</strong>、<strong>OCR 文案提取</strong>、<strong>色彩量化</strong> 与 <strong>相似图向量生成</strong>。
             </p>
           </div>
         </div>
       </div>
 
       {processingFiles.length > 0 && (
-        <div className="mt-8 bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-          <h4 className="text-slate-800 font-semibold mb-4 flex items-center">
+        <div className="mt-8 bg-zinc-900 rounded-xl p-6 border border-zinc-800 shadow-sm">
+          <h4 className="text-zinc-100 font-semibold mb-4 flex items-center">
             <span className="relative flex h-3 w-3 mr-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
             </span>
-            AI 混合分析引擎运行中 ({processingFiles.length})
+            正在进行深度视觉计算 ({processingFiles.length})
           </h4>
           <div className="space-y-2">
             {processingFiles.map((name, i) => (
-              <div key={i} className="flex items-center justify-between text-sm p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <span className="text-slate-700 font-medium">{name}</span>
+              <div key={i} className="flex items-center justify-between text-sm p-3 rounded-lg bg-zinc-800 border border-zinc-700">
+                <span className="text-zinc-300 font-medium">{name}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-slate-400 text-xs">Step 1: CV Color Extraction...</span>
-                  <span className="text-blue-600 font-medium animate-pulse">Step 2: Semantic Tagging...</span>
+                  <span className="text-zinc-500 text-xs">Step 1: Vision CV...</span>
+                  <span className="text-blue-400 font-medium animate-pulse">Step 2: Gemini Embeddings...</span>
                 </div>
               </div>
             ))}

@@ -4,10 +4,24 @@ export enum ViewState {
   GALLERY = 'GALLERY',
   UPLOAD = 'UPLOAD',
   TRENDS = 'TRENDS',
-  DETAILS = 'DETAILS'
+  DETAILS = 'DETAILS',
+  ART_TOOLS = 'ART_TOOLS'
 }
 
 // --- 1. Strict Taxonomies (The "Ground Truth" Labels) ---
+
+export enum GameProject {
+  TGM = 'The Grand Mafia',
+  HC = 'Hollywood Crush',
+  AA = 'Ace Alliance',
+  OTHER = 'Other (其他项目)'
+}
+
+export enum PerformanceLevel {
+  TOP = 'TOP (>$10k/mo)',
+  STANDARD = 'Standard (>$1k/mo)',
+  UNRATED = 'Unrated'
+}
 
 export enum GameGenre {
   SLG = 'SLG (策略)',
@@ -58,22 +72,40 @@ export interface ColorData {
   isWarm: boolean;
 }
 
+export interface BoundingBox {
+  ymin: number;
+  xmin: number;
+  ymax: number;
+  xmax: number;
+  label: string;
+}
+
 export interface VisualAnalysis {
   composition: CompositionType; // Strict Enum
   mainSubject: string;
-  visualDensity: 'High' | 'Medium' | 'Low'; // Calculated or estimated
+  subjectBox?: BoundingBox; // New: Object detection
+  visualDensity: 'High' | 'Medium' | 'Low';
   cameraAngle: string;
-  uiElements: string[]; // e.g. ["Button", "HealthBar", "HandCursor"]
-  realColorPalette: ColorData[]; // Extracted via Canvas (Code), not LLM
+  uiElements: { name: string; box?: BoundingBox }[]; // Updated: UI with locations
+  realColorPalette: ColorData[]; // Extracted via Canvas
+  ocrText?: string[]; // New: OCR
 }
 
 export interface MarketingAnalysis {
   hookType: HookType; // Strict Enum
+  hookStrength: number; // 0-100
   emotionalTrigger: string;
   targetAudience: string;
   painPoints: string[];
   callToAction: string;
   valueProposition: string;
+}
+
+export interface ReplicationTemplate {
+  visualFormula: string; // "Big Head + Red BG"
+  hookBlueprint: string; // "Crisis -> Fail -> Retry"
+  compositionGuide: string; // "Subject at 1/3 line"
+  colorStrategy: string; // "High contrast red/blue"
 }
 
 export interface CreativeStrategy {
@@ -82,11 +114,12 @@ export interface CreativeStrategy {
   weaknesses: string[];
   improvementTips: string[];
   adCopyVariations: { headline: string; body: string }[];
-  variantIdeas: string[];
+  replicationTemplate: ReplicationTemplate; // New: Template for reproduction
 }
 
 export interface AnalysisResult {
   title: string;
+  project: GameProject; // New: Project Classification
   genre: GameGenre; // Strict Enum
   style: VisualStyle; // Strict Enum
   tags: string[]; // General tags
@@ -98,7 +131,6 @@ export interface AnalysisResult {
     flags: string[];
     platformCompliance: string;
   };
-  replicationPrompt: string;
 }
 
 export interface Asset {
@@ -106,6 +138,8 @@ export interface Asset {
   url: string;
   fileName: string;
   uploadDate: string;
+  notes?: string; // User notes
+  performanceLevel: PerformanceLevel; // New: Manual Data Labeling
   // The "Ground Truth" computed by JS
   computedMeta: {
     width: number;
@@ -114,11 +148,13 @@ export interface Asset {
     aspectRatio: string;
   };
   analysis: AnalysisResult | null;
+  embedding?: number[]; // New: Vector for similarity search
   status: 'processing' | 'completed' | 'failed';
 }
 
 export interface FilterState {
   search: string;
+  projects: GameProject[];
   genres: GameGenre[];
   hooks: HookType[];
   styles: VisualStyle[];
