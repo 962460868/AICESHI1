@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult } from "../types";
 import { SYSTEM_PROMPT } from "../constants";
@@ -21,8 +22,7 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
 
 export const analyzeImage = async (base64Data: string, mimeType: string): Promise<AnalysisResult> => {
   if (!apiKey) {
-    console.error("API Key is missing");
-    throw new Error("API Key is missing. Please set process.env.API_KEY.");
+    throw new Error("API Key is missing");
   }
 
   try {
@@ -40,39 +40,30 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
           type: Type.OBJECT,
           properties: {
             title: { type: Type.STRING },
-            genre: { type: Type.STRING },
-            style: { type: Type.STRING },
-            tags: { 
-              type: Type.ARRAY, 
-              items: { 
-                type: Type.OBJECT,
-                properties: {
-                    category: { type: Type.STRING },
-                    value: { type: Type.STRING }
-                }
-              } 
-            },
+            genre: { type: Type.STRING }, // Will match Enum
+            style: { type: Type.STRING }, // Will match Enum
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
             visual: {
               type: Type.OBJECT,
               properties: {
-                composition: { type: Type.STRING },
+                composition: { type: Type.STRING }, // Will match Enum
                 mainSubject: { type: Type.STRING },
-                colorPalette: { type: Type.ARRAY, items: { type: Type.STRING } },
-                lighting: { type: Type.STRING },
+                visualDensity: { type: Type.STRING, enum: ['High', 'Medium', 'Low'] },
                 cameraAngle: { type: Type.STRING },
-                sceneDescription: { type: Type.STRING },
-                visualHierarchy: { type: Type.STRING },
+                uiElements: { type: Type.ARRAY, items: { type: Type.STRING } },
+                // Note: realColorPalette is filled by JS, but we let AI extract semantic colors if it wants, 
+                // though we prioritize JS for the UI.
               }
             },
             marketing: {
               type: Type.OBJECT,
               properties: {
-                hookType: { type: Type.STRING },
+                hookType: { type: Type.STRING }, // Will match Enum
                 emotionalTrigger: { type: Type.STRING },
                 targetAudience: { type: Type.STRING },
                 painPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
-                valueProposition: { type: Type.STRING },
                 callToAction: { type: Type.STRING },
+                valueProposition: { type: Type.STRING },
               }
             },
             strategy: {
@@ -112,7 +103,11 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
 
-    return JSON.parse(text) as AnalysisResult;
+    const json = JSON.parse(text);
+    
+    // Here we could post-process or validate against enums if strictly necessary,
+    // but the Schema usually handles it well enough.
+    return json as AnalysisResult;
   } catch (error) {
     console.error("Error analyzing image:", error);
     throw error;
