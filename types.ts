@@ -50,7 +50,8 @@ export enum CompositionType {
   FIRST_PERSON = '第一人称视角',
   ISOMETRIC = '等轴测 (2.5D上帝视角)',
   GRID = '网格/宫格布局',
-  UI_HEAVY = 'UI 引导主导'
+  UI_HEAVY = 'UI 引导主导',
+  DIAGONAL = '对角线构图'
 }
 
 export enum HookType {
@@ -69,7 +70,7 @@ export enum HookType {
 export interface ColorData {
   hex: string;
   percentage: number; // 0-100
-  isWarm: boolean;
+  isWarm?: boolean;
 }
 
 export interface BoundingBox {
@@ -80,6 +81,15 @@ export interface BoundingBox {
   label: string;
 }
 
+export interface ComputedMeta {
+  width: number;
+  height: number;
+  dominantColors: string[]; // Hex codes
+  aspectRatio: string;
+  brightness: number; // 0-255 (Real calc)
+  contrast: number; // 0-100 (Real calc)
+}
+
 export interface VisualAnalysis {
   composition: CompositionType; // Strict Enum
   mainSubject: string;
@@ -87,7 +97,7 @@ export interface VisualAnalysis {
   visualDensity: 'High' | 'Medium' | 'Low';
   cameraAngle: string;
   uiElements: { name: string; box?: BoundingBox }[]; // Updated: UI with locations
-  realColorPalette: ColorData[]; // Extracted via Canvas
+  realColorPalette: ColorData[]; // Extracted via Canvas or AI
   ocrText?: string[]; // New: OCR
 }
 
@@ -143,12 +153,7 @@ export interface Asset {
   notes?: string; // User notes
   performanceLevel: PerformanceLevel; // New: Manual Data Labeling
   // The "Ground Truth" computed by JS
-  computedMeta: {
-    width: number;
-    height: number;
-    dominantColors: string[]; // Hex codes
-    aspectRatio: string;
-  };
+  computedMeta: ComputedMeta;
   analysis: AnalysisResult | null;
   embedding?: number[]; // New: Vector for similarity search
   status: 'processing' | 'completed' | 'failed';

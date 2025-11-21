@@ -138,7 +138,9 @@ const getTaskOutputs = async (taskId: string, apiKey: string): Promise<TaskResul
 };
 
 // --- Public Methods ---
+
 // Helper to sanitize inputs: Convert to PNG Blob and use generic filename
+// This is critical to avoid "garbled images" caused by incompatible formats or encoding
 const prepareImageInput = async (file: File, genericName: string = "input.png"): Promise<{blob: Blob, name: string}> => {
     const pngBlob = await fileToPngBlob(file);
     return { blob: pngBlob, name: genericName };
@@ -211,7 +213,7 @@ export const startMattingTask = async (file: File): Promise<string> => {
 
 export const startVideoRestoreTask = async (file: File): Promise<string> => {
     const apiKey = API_CONFIG.VIDEO_RESTORE.KEY;
-    // Video does not use prepareImageInput, upload direct.
+    // Video does not use prepareImageInput, but we rename to generic name
     const uploadedName = await uploadFile(file, apiKey, "input.mp4");
     const nodeInfo = [{ nodeId: "36", fieldName: "video", fieldValue: uploadedName }];
     return runTask(apiKey, API_CONFIG.VIDEO_RESTORE.ID, nodeInfo, "plus");

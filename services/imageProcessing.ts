@@ -1,28 +1,15 @@
 
-import { ColorData } from '../types';
+import { ColorData, ComputedMeta } from '../types';
 
 // Helper to convert RGB to Hex
 const rgbToHex = (r: number, g: number, b: number) => 
   "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 
-// Determine if a color is "warm" (simple heuristic)
-const isWarmColor = (r: number, g: number, b: number) => {
-  // High Red, Low Blue usually indicates warm
-  return r > b; 
-};
-
-export interface ImageMeta {
-  width: number;
-  height: number;
-  aspectRatio: string;
-  dominantColors: ColorData[];
-}
-
 /**
  * Extracts real data from the image using HTML5 Canvas.
  * This prevents LLM "hallucination" regarding colors and dimensions.
  */
-export const extractImageMeta = async (file: File): Promise<ImageMeta> => {
+export const extractImageMeta = async (file: File): Promise<ComputedMeta> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -37,7 +24,7 @@ export const extractImageMeta = async (file: File): Promise<ImageMeta> => {
         return;
       }
 
-      // Resize for performance (max 200px)
+      // Resize for performance (max 200px) for color/brightness analysis
       const scale = Math.min(1, 200 / Math.max(img.width, img.height));
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
@@ -48,13 +35,22 @@ export const extractImageMeta = async (file: File): Promise<ImageMeta> => {
       const colorCounts: Record<string, { count: number, r: number, g: number, b: number }> = {};
       
       // Quantize and count colors (Simple clustering)
-      const pixelStep = 4 * 10; // Sample every 10th pixel
+      const pixelStep = 4 * 5; // Sample every 5th pixel for better accuracy
       let totalPixels = 0;
+      let totalBrightness = 0;
+      const brightnessValues: number[] = [];
 
       for (let i = 0; i < imageData.length; i += pixelStep) {
         const r = imageData[i];
         const g = imageData[i + 1];
         const b = imageData[i + 2];
+        
+        // Brightness (Luminance standard: 0.299R + 0.587G + 0.114B)
+        // Range 0-255
+        const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalBrightness += brightness;
+        brightnessValues.push(brightness);
+
         // Quantize to nearest 32 to group similar colors
         const key = `${Math.floor(r / 32) * 32},${Math.floor(g / 32) * 32},${Math.floor(b / 32) * 32}`;
         
@@ -65,15 +61,25 @@ export const extractImageMeta = async (file: File): Promise<ImageMeta> => {
         totalPixels++;
       }
 
+      // Calculate Avg Brightness
+      const pixelCount = brightnessValues.length;
+      const avgBrightness = pixelCount > 0 ? totalBrightness / pixelCount : 0;
+
+      // Calculate Contrast (Standard Deviation of Brightness)
+      // A completely gray image has 0 contrast. A high contrast image has high variance.
+      let sumSqDiff = 0;
+      for (const b of brightnessValues) {
+        sumSqDiff += Math.pow(b - avgBrightness, 2);
+      }
+      // Normalize slightly: typical std dev for image is 40-80. We can map it to 0-100 roughly.
+      const stdDev = pixelCount > 0 ? Math.sqrt(sumSqDiff / pixelCount) : 0;
+      const contrast = Math.min(100, (stdDev / 128) * 100 * 2); // Approximate scaling
+
       // Sort and get top 5 colors
       const sortedColors = Object.values(colorCounts)
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
-        .map(c => ({
-          hex: rgbToHex(c.r, c.g, c.b),
-          percentage: Math.round((c.count / totalPixels) * 100),
-          isWarm: isWarmColor(c.r, c.g, c.b)
-        }));
+        .map(c => rgbToHex(c.r, c.g, c.b));
 
       // Aspect Ratio
       const ratio = img.width / img.height;
@@ -87,7 +93,9 @@ export const extractImageMeta = async (file: File): Promise<ImageMeta> => {
         width: img.width,
         height: img.height,
         aspectRatio: arString,
-        dominantColors: sortedColors
+        dominantColors: sortedColors,
+        brightness: Math.round(avgBrightness),
+        contrast: Math.round(contrast) // Now real calculated contrast
       });
     };
     
@@ -137,8 +145,6 @@ export const compressImage = async (file: File, maxWidth = 1024, quality = 0.85)
 
 /**
  * Converts any image file to a standard PNG Blob.
- * This ensures compatibility with APIs that are picky about file formats (e.g. RunningHub).
- * It also strips metadata and fixes rotation.
  */
 export const fileToPngBlob = async (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {

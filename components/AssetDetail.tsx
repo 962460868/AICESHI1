@@ -142,30 +142,57 @@ export const AssetDetail: React.FC<AssetDetailProps> = ({ asset, onBack }) => {
             </div>
             
             <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 flex justify-between backdrop-blur-md">
-                <span>分辨率: {computedMeta.width} x {computedMeta.height}</span>
-                <span>比例: {computedMeta.aspectRatio}</span>
+                <span>{computedMeta.width} x {computedMeta.height}</span>
+                <span>{computedMeta.aspectRatio}</span>
             </div>
           </div>
 
           {/* The "Truth" Panel */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                🎨 真实色彩数据 (CV算法提取)
+                🎨 视觉物理属性 (Image Physics)
             </h3>
-            <div className="space-y-3">
-                {visual.realColorPalette?.map((color: any, i: number) => (
+            
+            {/* Brightness & Contrast Bars */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                   <div className="text-xs text-slate-500 mb-1 flex justify-between">
+                     <span>亮度 (Brightness)</span>
+                     <span>{computedMeta.brightness || 0}</span>
+                   </div>
+                   <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                     {/* Max brightness ~255 */}
+                     <div className="h-full bg-yellow-400" style={{width: `${(computedMeta.brightness || 0) / 2.55}%`}}></div>
+                   </div>
+                </div>
+                <div>
+                   <div className="text-xs text-slate-500 mb-1 flex justify-between">
+                     <span>对比度 (Contrast)</span>
+                     <span>{computedMeta.contrast || 0}</span>
+                   </div>
+                   <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                     {/* Max contrast ~100 */}
+                     <div className="h-full bg-slate-800" style={{width: `${Math.min(100, computedMeta.contrast || 0)}%`}}></div>
+                   </div>
+                </div>
+            </div>
+
+            <div className="space-y-3 border-t border-slate-100 pt-4">
+                <div className="text-xs font-bold text-slate-400 mb-2">核心色板 (Computed)</div>
+                {/* Use computedMeta dominant colors if visual.realColorPalette is empty or unreliable */}
+                {(visual.realColorPalette?.length ? visual.realColorPalette : computedMeta.dominantColors.map(c => ({hex: c, percentage: 0}))).map((color: any, i: number) => (
                     <div key={i} className="flex items-center gap-3">
                         <div 
-                            className="w-12 h-12 rounded-lg shadow-inner border border-black/5" 
+                            className="w-8 h-8 rounded shadow-sm border border-black/5" 
                             style={{backgroundColor: color.hex}}
                         ></div>
                         <div className="flex-1">
                             <div className="flex justify-between mb-1">
                                 <span className="font-mono text-xs font-bold text-slate-700">{color.hex}</span>
-                                <span className="text-xs text-slate-500">{color.percentage}% 占比</span>
+                                <span className="text-xs text-slate-500">{color.percentage > 0 ? color.percentage + '%' : ''}</span>
                             </div>
-                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-slate-400 h-full rounded-full" style={{width: `${color.percentage}%`}}></div>
+                            <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                                <div className="bg-slate-400 h-full rounded-full" style={{width: `${color.percentage || 100}%`}}></div>
                             </div>
                         </div>
                     </div>
@@ -177,9 +204,41 @@ export const AssetDetail: React.FC<AssetDetailProps> = ({ asset, onBack }) => {
                 className="w-full mt-4 flex items-center justify-center gap-2 py-2 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs text-slate-600 transition-colors"
                >
                  <span className="text-red-500 font-bold">Y</span>
-                 <span>在 Yandex 上搜索相似图 (以图搜图)</span>
+                 <span>在 Yandex 上搜索相似图</span>
                </button>
           </div>
+          
+           {/* AI Safety & Risk */}
+           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                🛡️ AI 安全与合规
+                <span className={`px-2 py-0.5 rounded text-[10px] ${risk.riskScore < 30 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    风险分: {risk.riskScore}
+                </span>
+              </h3>
+              <div className="text-xs text-slate-600 space-y-2">
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span>平台合规性:</span>
+                      <span className="font-medium text-slate-800">{risk.platformCompliance}</span>
+                  </div>
+                  {risk.flags && risk.flags.length > 0 ? (
+                       <div className="pt-2">
+                          <div className="mb-1 text-slate-500">潜在风险标签:</div>
+                          <div className="flex flex-wrap gap-1">
+                              {risk.flags.map(f => (
+                                  <span key={f} className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded border border-red-100">
+                                      {f}
+                                  </span>
+                              ))}
+                          </div>
+                       </div>
+                  ) : (
+                      <div className="pt-2 text-green-600 flex items-center gap-1">
+                          <span>✅</span> 未发现明显违规内容
+                      </div>
+                  )}
+              </div>
+           </div>
 
           {/* OCR Result */}
           {visual.ocrText && visual.ocrText.length > 0 && (
@@ -187,7 +246,7 @@ export const AssetDetail: React.FC<AssetDetailProps> = ({ asset, onBack }) => {
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">
                 🔤 OCR 文本识别
               </h3>
-              <div className="bg-slate-50 p-3 rounded border border-slate-100 text-xs text-slate-700 font-mono leading-relaxed">
+              <div className="bg-slate-50 p-3 rounded border border-slate-100 text-xs text-slate-700 font-mono leading-relaxed max-h-40 overflow-y-auto custom-scrollbar">
                 {visual.ocrText.join('\n')}
               </div>
             </div>
@@ -310,7 +369,7 @@ export const AssetDetail: React.FC<AssetDetailProps> = ({ asset, onBack }) => {
               <div className="grid grid-cols-3 gap-4">
                 {similarAssets.map(item => (
                   <div key={item.asset.id} className="group cursor-pointer" onClick={() => {
-                    alert("跳转功能需路由支持，此处仅展示相似度：" + (item.score || 0).toFixed(2));
+                    alert("相似度：" + (item.score * 100).toFixed(1) + "%");
                   }}>
                     <div className="aspect-video rounded-lg overflow-hidden border border-slate-200 relative">
                        <img src={item.asset.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform"/>

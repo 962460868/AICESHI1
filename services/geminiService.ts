@@ -76,7 +76,7 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
           type: Type.OBJECT,
           properties: {
             title: { type: Type.STRING },
-            project: { type: Type.STRING }, // New: Project Classification
+            project: { type: Type.STRING },
             genre: { type: Type.STRING }, 
             style: { type: Type.STRING }, 
             tags: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -97,14 +97,25 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
                 },
                 visualDensity: { type: Type.STRING, enum: ['High', 'Medium', 'Low'] },
                 cameraAngle: { type: Type.STRING },
-                ocrText: { type: Type.ARRAY, items: { type: Type.STRING } }, // OCR
+                ocrText: { type: Type.ARRAY, items: { type: Type.STRING } },
+                realColorPalette: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      hex: { type: Type.STRING },
+                      percentage: { type: Type.NUMBER },
+                      isWarm: { type: Type.BOOLEAN }
+                    }
+                  }
+                },
                 uiElements: { 
                   type: Type.ARRAY, 
                   items: { 
                     type: Type.OBJECT,
                     properties: {
                       name: { type: Type.STRING },
-                      box: { // UI Location
+                      box: {
                          type: Type.OBJECT,
                          properties: {
                            ymin: { type: Type.NUMBER },
@@ -138,9 +149,9 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
                 strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
                 weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
                 improvementTips: { type: Type.ARRAY, items: { type: Type.STRING } },
-                midjourneyPrompt: { type: Type.STRING }, // New: MJ
-                jimengPrompt: { type: Type.STRING }, // New: Jimeng
-                replicationTemplate: { // Structured Template
+                midjourneyPrompt: { type: Type.STRING },
+                jimengPrompt: { type: Type.STRING },
+                replicationTemplate: {
                   type: Type.OBJECT,
                   properties: {
                     visualFormula: { type: Type.STRING },

@@ -20,16 +20,19 @@ export const AssetProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const saved = localStorage.getItem('ci_hub_assets');
     if (saved) {
       try {
-        setAssets(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setAssets(parsed);
       } catch (e) {
-        console.error("Failed to load assets", e);
+        console.error("Failed to load assets from storage", e);
       }
     }
   }, []);
 
   // Save to local storage on change
   useEffect(() => {
-    localStorage.setItem('ci_hub_assets', JSON.stringify(assets));
+    if (assets.length > 0) {
+        localStorage.setItem('ci_hub_assets', JSON.stringify(assets));
+    }
   }, [assets]);
 
   const addAsset = (asset: Asset) => {

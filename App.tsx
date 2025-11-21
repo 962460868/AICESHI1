@@ -66,6 +66,7 @@ const MainContent: React.FC = () => {
         );
       case ViewState.ART_TOOLS:
         // Use h-full to ensure ArtTools takes up all available space for internal scrolling
+        // The container logic for scrolling is handled INSIDE ArtTools
         return (
             <div className="h-full w-full overflow-hidden">
                 <ArtTools />

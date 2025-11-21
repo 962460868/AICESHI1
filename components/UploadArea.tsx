@@ -23,7 +23,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
       url: objectUrl,
       fileName: file.name,
       uploadDate: new Date().toISOString(),
-      computedMeta: { width: 0, height: 0, dominantColors: [], aspectRatio: '?' },
+      computedMeta: { width: 0, height: 0, dominantColors: [], aspectRatio: '?', brightness: 0, contrast: 0 },
       analysis: null,
       status: 'processing',
       performanceLevel: PerformanceLevel.UNRATED
@@ -32,13 +32,15 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
     onAssetProcessed(newAsset);
 
     try {
-      // 2. Client-Side Computer Vision (Dimensions & Colors)
+      // 2. Client-Side Computer Vision (Dimensions, Colors, Brightness, Contrast)
       const meta = await extractImageMeta(file);
       newAsset = { ...newAsset, computedMeta: { 
         width: meta.width, 
         height: meta.height, 
-        dominantColors: meta.dominantColors.map(c => c.hex),
-        aspectRatio: meta.aspectRatio
+        dominantColors: meta.dominantColors,
+        aspectRatio: meta.aspectRatio,
+        brightness: meta.brightness,
+        contrast: meta.contrast
       }};
       onAssetProcessed(newAsset);
 
@@ -49,9 +51,13 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onAssetProcessed }) => {
 
       const analysis = await analyzeImage(base64Data, 'image/jpeg');
       
-      // Merge CV colors (Trust CV over AI for colors)
-      if (analysis.visual) {
-        analysis.visual.realColorPalette = meta.dominantColors;
+      // Merge CV colors (Trust CV over AI for colors if AI is empty)
+      if (analysis.visual && (!analysis.visual.realColorPalette || analysis.visual.realColorPalette.length === 0)) {
+        analysis.visual.realColorPalette = meta.dominantColors.map(hex => ({
+          hex,
+          percentage: 0, 
+          isWarm: false // Placeholder
+        }));
       }
 
       // 4. Generate Embedding (Semantic Search)

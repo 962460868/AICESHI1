@@ -119,7 +119,7 @@ export const ArtTools: React.FC = () => {
               fileName: `${task.type}_${task.inputFile.name}_${idx+1}.${res.type === 'video' ? 'mp4' : 'png'}`,
               uploadDate: new Date().toISOString(),
               performanceLevel: PerformanceLevel.UNRATED,
-              computedMeta: { width: 0, height: 0, dominantColors: [], aspectRatio: '?' },
+              computedMeta: { width: 0, height: 0, dominantColors: [], aspectRatio: '?', brightness: 0, contrast: 0 },
               analysis: null,
               status: 'processing'
           };
