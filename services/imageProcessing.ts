@@ -134,3 +134,35 @@ export const compressImage = async (file: File, maxWidth = 1024, quality = 0.85)
     img.src = objectUrl;
   });
 };
+
+/**
+ * Converts any image file to a standard PNG Blob.
+ * This ensures compatibility with APIs that are picky about file formats (e.g. RunningHub).
+ * It also strips metadata and fixes rotation.
+ */
+export const fileToPngBlob = async (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error("Canvas context failed"));
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("Blob conversion failed"));
+            }, 'image/png');
+        };
+
+        img.onerror = (e) => reject(e);
+        img.src = objectUrl;
+    });
+};

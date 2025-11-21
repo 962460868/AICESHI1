@@ -15,7 +15,6 @@ const MainContent: React.FC = () => {
   const { assets, addAsset, updateAsset } = useAssets();
 
   const handleAssetProcessed = (asset: Asset) => {
-    // The logic is simpler now that AssetContext handles duplication check by ID
     if (asset.status === 'processing') {
        addAsset(asset);
     } else {
@@ -25,7 +24,6 @@ const MainContent: React.FC = () => {
 
   const handleSelectAssetForInspector = (asset: Asset) => {
     setSelectedAsset(asset);
-    // We stay in GALLERY view to show the inspector sidebar
   };
 
   const handleOpenFullDetail = (asset: Asset) => {
@@ -37,7 +35,7 @@ const MainContent: React.FC = () => {
     switch (currentView) {
       case ViewState.UPLOAD:
         return (
-          <div className="max-w-5xl mx-auto pt-8">
+          <div className="max-w-5xl mx-auto pt-8 h-full overflow-y-auto">
             <div className="mb-8 px-4">
                <h2 className="text-2xl font-bold text-white">素材导入</h2>
                <p className="text-zinc-400 mt-1">上传游戏广告创意，AI 将自动进行深度结构化拆解。</p>
@@ -47,7 +45,7 @@ const MainContent: React.FC = () => {
         );
       case ViewState.GALLERY:
         return (
-           <div className="h-full">
+           <div className="h-full w-full">
             <AssetGrid 
               assets={assets} 
               onSelect={handleSelectAssetForInspector} 
@@ -58,7 +56,7 @@ const MainContent: React.FC = () => {
         );
       case ViewState.TRENDS:
         return (
-           <div className="max-w-7xl mx-auto pt-8 px-8">
+           <div className="max-w-7xl mx-auto pt-8 px-8 h-full overflow-y-auto">
              <div className="mb-8">
                <h2 className="text-2xl font-bold text-white">趋势洞察</h2>
                <p className="text-zinc-400 mt-1">基于库内资产的 AI 聚合分析与机会点挖掘。</p>
@@ -67,15 +65,16 @@ const MainContent: React.FC = () => {
            </div>
         );
       case ViewState.ART_TOOLS:
+        // Use h-full to ensure ArtTools takes up all available space for internal scrolling
         return (
-            <div className="h-full">
+            <div className="h-full w-full overflow-hidden">
                 <ArtTools />
             </div>
         );
       case ViewState.DETAILS:
         if (!selectedAsset) return <div className="text-white p-8">未选择资产</div>;
         return (
-           <div className="max-w-7xl mx-auto pt-6 px-6">
+           <div className="max-w-7xl mx-auto pt-6 px-6 h-full overflow-y-auto pb-10">
              <AssetDetail 
                 asset={selectedAsset} 
                 onBack={() => setView(ViewState.GALLERY)} 
@@ -93,7 +92,8 @@ const MainContent: React.FC = () => {
           setView(view);
           if(view !== ViewState.DETAILS && view !== ViewState.GALLERY) setSelectedAsset(null);
       }} />
-      <main className="flex-1 overflow-hidden relative">
+      {/* Main container must be flex-col and h-full to allow children to fill height */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         {renderContent()}
       </main>
     </div>

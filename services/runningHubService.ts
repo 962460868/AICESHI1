@@ -1,5 +1,6 @@
 
 import { v4 as uuidv4 } from 'uuid';
+import { fileToPngBlob } from './imageProcessing';
 
 // --- Constants from Python Script ---
 const API_CONFIG = {
@@ -67,11 +68,15 @@ export interface RunningHubTask {
 
 // --- API Helpers ---
 
-const uploadFile = async (file: File, apiKey: string): Promise<string> => {
+const uploadFile = async (fileOrBlob: File | Blob, apiKey: string, fileName: string): Promise<string> => {
     const formData = new FormData();
-    formData.append('file', file);
+    // Ensure we send a valid file object with a safe name
+    formData.append('file', fileOrBlob, fileName);
     formData.append('apiKey', apiKey);
-    formData.append('fileType', file.type.startsWith('video') ? 'video' : 'image');
+    
+    // Determine file type for API
+    const isVideo = fileName.endsWith('.mp4');
+    formData.append('fileType', isVideo ? 'video' : 'image');
 
     const res = await fetch('https://www.runninghub.cn/task/openapi/upload', {
         method: 'POST',
@@ -133,10 +138,16 @@ const getTaskOutputs = async (taskId: string, apiKey: string): Promise<TaskResul
 };
 
 // --- Public Methods ---
+// Helper to sanitize inputs: Convert to PNG Blob and use generic filename
+const prepareImageInput = async (file: File, genericName: string = "input.png"): Promise<{blob: Blob, name: string}> => {
+    const pngBlob = await fileToPngBlob(file);
+    return { blob: pngBlob, name: genericName };
+};
 
 export const startEnhanceTask = async (file: File, version: 'WAN 2.2' | 'WAN 2.1', style: '默认' | '写实' | '3D卡通'): Promise<string> => {
     const apiKey = API_CONFIG.ENHANCE.KEY;
-    const uploadedName = await uploadFile(file, apiKey);
+    const { blob, name } = await prepareImageInput(file, "input.png");
+    const uploadedName = await uploadFile(blob, apiKey, name);
     
     let webappId = API_CONFIG.ENHANCE.ID_V2_2;
     let nodeInfo: any[] = [];
@@ -145,7 +156,6 @@ export const startEnhanceTask = async (file: File, version: 'WAN 2.2' | 'WAN 2.1
     if (version === 'WAN 2.1') {
         webappId = API_CONFIG.ENHANCE.ID_V2_1;
         nodeInfo = [{ nodeId: "38", fieldName: "image", fieldValue: uploadedName }];
-        // Add prompts manually for V2.1 if style is not default
         if (style !== '默认' && STYLE_PROMPTS[style]) {
             nodeInfo.push(
                 { nodeId: "60", fieldName: "text", fieldValue: STYLE_PROMPTS[style].positive },
@@ -153,7 +163,6 @@ export const startEnhanceTask = async (file: File, version: 'WAN 2.2' | 'WAN 2.1
             );
         }
     } else {
-        // WAN 2.2
         if (style === '写实') {
             webappId = API_CONFIG.ENHANCE.ID_V2_2_REALISTIC;
             nodeInfo = [{ nodeId: "14", fieldName: "image", fieldValue: uploadedName }];
@@ -162,10 +171,8 @@ export const startEnhanceTask = async (file: File, version: 'WAN 2.2' | 'WAN 2.1
             webappId = API_CONFIG.ENHANCE.ID_V2_2_3D;
             nodeInfo = [{ nodeId: "38", fieldName: "image", fieldValue: uploadedName }];
         } else {
-            // Default 2.2
             webappId = API_CONFIG.ENHANCE.ID_V2_2;
             nodeInfo = [{ nodeId: "14", fieldName: "image", fieldValue: uploadedName }];
-             // Add prompts manually for V2.2 Default
              if (style !== '默认' && STYLE_PROMPTS[style]) {
                  nodeInfo.push(
                     { nodeId: "66", fieldName: "text", fieldValue: STYLE_PROMPTS[style].positive },
@@ -180,36 +187,43 @@ export const startEnhanceTask = async (file: File, version: 'WAN 2.2' | 'WAN 2.1
 
 export const startWatermarkTask = async (file: File): Promise<string> => {
     const apiKey = API_CONFIG.WATERMARK.KEY;
-    const uploadedName = await uploadFile(file, apiKey);
+    const { blob, name } = await prepareImageInput(file, "input.png");
+    const uploadedName = await uploadFile(blob, apiKey, name);
     const nodeInfo = [{ nodeId: "191", fieldName: "image", fieldValue: uploadedName }];
     return runTask(apiKey, API_CONFIG.WATERMARK.ID, nodeInfo);
 };
 
 export const startLightingTask = async (file: File): Promise<string> => {
     const apiKey = API_CONFIG.LIGHTING.KEY;
-    const uploadedName = await uploadFile(file, apiKey);
+    const { blob, name } = await prepareImageInput(file, "input.png");
+    const uploadedName = await uploadFile(blob, apiKey, name);
     const nodeInfo = [{ nodeId: "437", fieldName: "image", fieldValue: uploadedName }];
     return runTask(apiKey, API_CONFIG.LIGHTING.ID, nodeInfo, "plus");
 };
 
 export const startMattingTask = async (file: File): Promise<string> => {
     const apiKey = API_CONFIG.MATTING.KEY;
-    const uploadedName = await uploadFile(file, apiKey);
+    const { blob, name } = await prepareImageInput(file, "input.png");
+    const uploadedName = await uploadFile(blob, apiKey, name);
     const nodeInfo = [{ nodeId: "122", fieldName: "image", fieldValue: uploadedName }];
     return runTask(apiKey, API_CONFIG.MATTING.ID, nodeInfo);
 };
 
 export const startVideoRestoreTask = async (file: File): Promise<string> => {
     const apiKey = API_CONFIG.VIDEO_RESTORE.KEY;
-    const uploadedName = await uploadFile(file, apiKey);
+    // Video does not use prepareImageInput, upload direct.
+    const uploadedName = await uploadFile(file, apiKey, "input.mp4");
     const nodeInfo = [{ nodeId: "36", fieldName: "video", fieldValue: uploadedName }];
     return runTask(apiKey, API_CONFIG.VIDEO_RESTORE.ID, nodeInfo, "plus");
 };
 
 export const startPoseTask = async (charFile: File, poseFile: File, strength: number): Promise<string> => {
     const apiKey = API_CONFIG.POSE.KEY;
-    const charName = await uploadFile(charFile, apiKey);
-    const poseName = await uploadFile(poseFile, apiKey);
+    const charInput = await prepareImageInput(charFile, "character.png");
+    const poseInput = await prepareImageInput(poseFile, "pose.png");
+    
+    const charName = await uploadFile(charInput.blob, apiKey, charInput.name);
+    const poseName = await uploadFile(poseInput.blob, apiKey, poseInput.name);
     
     const nodeInfo = [
         { nodeId: "6", fieldName: "image", fieldValue: charName },
@@ -221,11 +235,11 @@ export const startPoseTask = async (charFile: File, poseFile: File, strength: nu
 };
 
 export const pollTask = async (taskId: string, toolType: ToolType, onStatus: (s: string) => void): Promise<TaskResult[]> => {
-    let apiKey = API_CONFIG.WATERMARK.KEY; // Default shared key
+    let apiKey = API_CONFIG.WATERMARK.KEY; 
     if (toolType === 'video_restore' || toolType === 'matting') apiKey = API_CONFIG.VIDEO_RESTORE.KEY;
 
     const POLL_INTERVAL = 3000;
-    const MAX_ATTEMPTS = 100; // 5 mins
+    const MAX_ATTEMPTS = 100; 
 
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
         const status = await checkTaskStatus(taskId, apiKey);

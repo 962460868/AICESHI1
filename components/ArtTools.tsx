@@ -66,7 +66,7 @@ export const ArtTools: React.FC = () => {
             newTasks.push(task);
         }
 
-        // Process Sequentially (Simplification for frontend)
+        // Process Sequentially
         for (const task of newTasks) {
             updateTaskStatus(task.id, 'processing');
             try {
@@ -121,28 +121,28 @@ export const ArtTools: React.FC = () => {
               performanceLevel: PerformanceLevel.UNRATED,
               computedMeta: { width: 0, height: 0, dominantColors: [], aspectRatio: '?' },
               analysis: null,
-              status: 'processing' // Will trigger AI analysis in main app if properly integrated, strictly just 'completed' here for storage
+              status: 'processing'
           };
-          // We mark as completed so it shows up, but it won't have AI analysis until re-processed or we trigger it here.
-          // For now, just adding to library.
           addAsset({ ...newAsset, status: 'completed' });
       });
       alert('已保存到资产库');
   };
 
+  // CRITICAL LAYOUT FIX: h-full, w-full, overflow-hidden on parent
+  // and min-h-0 on flex children allow scrollbars to work correctly.
   return (
-    <div className="flex h-full bg-zinc-950 text-zinc-200">
+    <div className="flex h-full w-full bg-zinc-950 text-zinc-200 overflow-hidden">
         {/* Left: Controls */}
-        <div className="w-80 flex-shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col">
-            <div className="p-6 border-b border-zinc-800">
+        <div className="w-80 flex-shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full">
+            <div className="p-6 border-b border-zinc-800 flex-shrink-0">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     🎨 美术工具箱
                 </h2>
                 <p className="text-xs text-zinc-500 mt-1">RunningHub AI 驱动</p>
             </div>
             
-            <div className="flex-1 overflow-y-auto">
-                {/* Tabs */}
+            {/* Scrollable Controls Area */}
+            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
                 <div className="grid grid-cols-1 gap-1 p-2">
                     {TABS.map(tab => (
                         <button
@@ -160,8 +160,8 @@ export const ArtTools: React.FC = () => {
                     ))}
                 </div>
 
-                <div className="p-4 border-t border-zinc-800 space-y-6">
-                    {/* Dynamic Controls based on Active Tab */}
+                <div className="p-4 border-t border-zinc-800 space-y-6 pb-20">
+                    {/* Dynamic Controls */}
                     {activeTab === 'enhance' && (
                         <div className="space-y-4 animate-in fade-in">
                             <div>
@@ -262,13 +262,14 @@ export const ArtTools: React.FC = () => {
         </div>
 
         {/* Right: Queue & Results */}
-        <div className="flex-1 flex flex-col bg-zinc-950">
-            <div className="h-16 border-b border-zinc-800 flex items-center px-6 justify-between bg-zinc-900/50">
+        <div className="flex-1 flex flex-col bg-zinc-950 h-full overflow-hidden">
+            <div className="h-16 border-b border-zinc-800 flex items-center px-6 justify-between bg-zinc-900/50 flex-shrink-0">
                 <h3 className="font-bold text-zinc-300">任务队列 ({tasks.length})</h3>
                 {isProcessing && <div className="text-xs text-blue-400 animate-pulse">⚡ 后台处理中...</div>}
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {/* Scrollable Tasks Area */}
+            <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6 custom-scrollbar">
                 {tasks.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-zinc-600 opacity-50">
                         <div className="text-6xl mb-4">🎨</div>

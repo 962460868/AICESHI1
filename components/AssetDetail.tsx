@@ -25,6 +25,11 @@ export const AssetDetail: React.FC<AssetDetailProps> = ({ asset, onBack }) => {
       window.open(`https://yandex.com/images/search?text=${encodeURIComponent(query)}`, '_blank');
   };
 
+  const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text);
+      alert('已复制到剪贴板');
+  };
+
   if (!asset.analysis) return <div>加载中...</div>;
 
   const { analysis, computedMeta } = asset;
@@ -252,6 +257,49 @@ export const AssetDetail: React.FC<AssetDetailProps> = ({ asset, onBack }) => {
                         </li>
                     ))}
                 </ul>
+             </div>
+          </div>
+
+          {/* Generative Prompts (New) */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+             <h3 className="font-bold text-slate-900 border-l-4 border-purple-500 pl-3">✨ AIGC 提示词反推</h3>
+             
+             <div className="space-y-4">
+                {/* Midjourney */}
+                <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="text-xs font-bold text-zinc-400 flex items-center gap-2">
+                            <span className="text-xl">⛵</span> Midjourney V6 Prompt (English)
+                        </div>
+                        <button 
+                            onClick={() => copyToClipboard(strategy.midjourneyPrompt || '')}
+                            className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-2 py-1 rounded transition-colors"
+                        >
+                            复制
+                        </button>
+                    </div>
+                    <div className="text-sm text-zinc-300 font-mono leading-relaxed break-words">
+                        {strategy.midjourneyPrompt || "分析中..."}
+                    </div>
+                </div>
+
+                {/* Jimeng */}
+                <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="text-xs font-bold text-zinc-400 flex items-center gap-2">
+                            <span className="text-xl">🦋</span> 即梦 4.0 提示词 (Chinese)
+                        </div>
+                        <button 
+                            onClick={() => copyToClipboard(strategy.jimengPrompt || '')}
+                            className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-2 py-1 rounded transition-colors"
+                        >
+                            复制
+                        </button>
+                    </div>
+                    <div className="text-sm text-zinc-300 font-mono leading-relaxed break-words">
+                        {strategy.jimengPrompt || "分析中..."}
+                    </div>
+                </div>
              </div>
           </div>
 

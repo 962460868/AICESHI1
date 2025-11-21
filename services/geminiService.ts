@@ -138,6 +138,8 @@ export const analyzeImage = async (base64Data: string, mimeType: string): Promis
                 strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
                 weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
                 improvementTips: { type: Type.ARRAY, items: { type: Type.STRING } },
+                midjourneyPrompt: { type: Type.STRING }, // New: MJ
+                jimengPrompt: { type: Type.STRING }, // New: Jimeng
                 replicationTemplate: { // Structured Template
                   type: Type.OBJECT,
                   properties: {

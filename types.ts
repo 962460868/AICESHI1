@@ -113,6 +113,8 @@ export interface CreativeStrategy {
   strengths: string[];
   weaknesses: string[];
   improvementTips: string[];
+  midjourneyPrompt: string; // New: MJ Prompt
+  jimengPrompt: string; // New: Jimeng Prompt
   adCopyVariations: { headline: string; body: string }[];
   replicationTemplate: ReplicationTemplate; // New: Template for reproduction
 }
